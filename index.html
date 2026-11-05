@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f4">
+  <title>天气记录本</title>
+  <style>
+    :root { color-scheme: light; --ink:#182722; --muted:#68756f; --line:#dce4df; --paper:#f5f7f4; --green:#176b52; --mint:#e5f2eb; --blue:#e9f1f5; --orange:#f7eee2; --white:#fff; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    button,input { font:inherit; }
+    button { cursor:pointer; }
+    .shell { max-width:1180px; margin:auto; padding:28px 28px 48px; }
+    header { position:relative; display:flex; align-items:center; justify-content:center; min-height:152px; border-bottom:1px solid var(--line); padding:12px 0 22px; text-align:center; }
+    .brand { display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .mark { position:relative; width:60px; height:60px; display:grid; place-items:center; color:var(--green); border:2px solid currentColor; border-radius:50%; background:#f8faf8; box-shadow:inset 0 0 0 5px var(--paper); }
+    .mark::after { content:'天'; position:absolute; right:-7px; bottom:-5px; display:grid; place-items:center; width:22px; height:22px; border:2px solid var(--paper); border-radius:4px; background:#a3482c; color:#fff; font:12px/1 "STKaiti","KaiTi",serif; transform:rotate(-4deg); }
+    .brand h1 { margin:1px 0 0; color:#142720; font-family:"Mao Zedong","Maoti SC","STKaiti","Kaiti SC","KaiTi",serif; font-size:31px; font-weight:700; line-height:1.05; letter-spacing:.09em; transform:skewX(-2deg); }
+    .brand p { margin:3px 0 0; color:#61736b; font-family:"STKaiti","Kaiti SC","KaiTi",serif; font-size:14px; letter-spacing:.16em; }
+    .layout { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(280px,.85fr); gap:36px; padding-top:30px; }
+    .search { display:flex; gap:8px; margin-bottom:20px; }
+    .search-box { position:relative; min-width:0; flex:1; }
+    .search input { width:100%; min-width:0; border:1px solid #cbd6d0; border-radius:6px; padding:11px 13px; background:#fff; color:var(--ink); outline:none; }
+    .search input:focus { border-color:var(--green); box-shadow:0 0 0 3px #176b521c; }
+    .region-picker { position:absolute; z-index:5; top:calc(100% + 7px); left:0; width:min(590px, calc(100vw - 44px)); max-height:min(480px, 65vh); display:flex; flex-direction:column; background:#fff; border:1px solid var(--line); border-radius:7px; box-shadow:0 12px 32px #19272024; overflow:hidden; }
+    .region-picker[hidden] { display:none; }
+    .region-picker-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px 9px; border-bottom:1px solid var(--line); }
+    .region-trail { display:flex; flex-wrap:wrap; align-items:center; gap:5px; font-size:12px; }
+    .trail-button { border:0; border-radius:3px; padding:2px 3px; color:var(--green); background:transparent; }
+    button.trail-button:hover,button.trail-button:focus-visible { outline:0; background:var(--mint); text-decoration:underline; text-underline-offset:3px; }
+    .trail-current { padding:2px 3px; color:var(--ink); font-weight:620; }
+    .trail-sep { color:#9aa69f; }
+    .picker-back { border:1px solid var(--line); border-radius:5px; color:var(--ink); background:#fff; padding:5px 9px; font-size:12px; }
+    .region-caption { padding:9px 14px 4px; color:var(--muted); font-size:11px; }
+    .region-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:2px; overflow:auto; padding:5px 9px 12px; }
+    .region-options.search-results { grid-template-columns:1fr; gap:0; padding:4px 9px 10px; }
+    .search-group-title { padding:8px 7px 5px; color:var(--muted); font-size:10px; font-weight:650; letter-spacing:.04em; }
+    .search-result { align-items:flex-start; padding:9px 8px; }
+    .search-result-main { display:flex; flex-direction:column; gap:2px; }
+    .search-result-name { color:var(--ink); font-size:13px; font-weight:620; }
+    .search-result-meta { color:var(--muted); font-size:10px; }
+    .search-result-kind { flex:none; margin-top:2px; border-radius:10px; padding:2px 6px; background:var(--mint); color:var(--green); font-size:9px; }
+    .global-loading { padding:13px 7px; color:var(--muted); font-size:11px; }
+    .region-option { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:5px; border:0; border-radius:4px; padding:8px 7px; background:transparent; color:var(--ink); text-align:left; font-size:12px; cursor:pointer; }
+    .region-option span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .region-option:hover,.region-option:focus { outline:0; background:var(--mint); color:#105841; }
+    .region-option small { color:var(--muted); font-size:10px; }
+    .region-empty { grid-column:1/-1; padding:14px 7px; color:var(--muted); font-size:12px; }
+    .region-footer { border-top:1px solid var(--line); padding:8px 14px; color:var(--muted); font-size:10px; }
+    .auto-status { margin-left:auto; font-size:11px; }
+    .primary { border:0; border-radius:6px; padding:10px 17px; background:var(--green); color:white; font-weight:600; }
+    .primary:hover { background:#105841; }
+    .primary:disabled { opacity:.65; cursor:wait; }
+    .weather { border-top:1px solid var(--line); padding-top:20px; min-height:306px; }
+    .weather-empty { min-height:285px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; }
+    .weather-empty-icon { color:#648078; }
+    .weather-top { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; }
+    .place { margin:0; font-size:20px; font-weight:650; }
+    .place-meta,.updated { color:var(--muted); font-size:12px; margin-top:4px; }
+    .condition { display:flex; align-items:center; gap:9px; color:#45554e; margin-top:22px; font-size:15px; }
+    .wx-icon { font-size:28px; line-height:1; }
+    .temperature { font-size:72px; line-height:1; font-weight:570; letter-spacing:0; margin-top:8px; }
+    .temperature sup { font-size:25px; vertical-align:top; margin-left:3px; }
+    .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin-top:25px; padding:14px 0; }
+    .metric { padding:0 12px; border-right:1px solid var(--line); }
+    .metric:first-child { padding-left:0; }
+    .metric:last-child { border:0; }
+    .metric-label { color:var(--muted); font-size:11px; }
+    .metric-value { font-size:16px; font-weight:620; margin-top:3px; white-space:nowrap; }
+    .section-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:29px 0 13px; }
+    .section-head h2 { margin:0; font-size:15px; font-weight:650; }
+    .section-note { color:var(--muted); font-size:11px; }
+    .forecast { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .day { text-align:center; padding:14px 4px 13px; border-right:1px solid var(--line); }
+    .day:last-child { border:0; }
+    .day-name { font-size:12px; color:var(--muted); }
+    .day-icon { font-size:21px; margin:8px 0; }
+    .day-temps { font-size:12px; font-weight:620; white-space:nowrap; }
+    .day-rain { color:#587b8b; font-size:10px; margin-top:5px; }
+    aside { border-left:1px solid var(--line); padding-left:28px; }
+    .side-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:1px 0 13px; border-bottom:1px solid var(--line); }
+    .side-head h2 { margin:0; font-size:15px; }
+    .icon-button { display:grid; place-items:center; width:34px; height:34px; border:1px solid var(--line); color:#46564e; background:transparent; border-radius:6px; }
+    .icon-button:hover { background:#eaf0ec; }
+    .icon-button:disabled { cursor:wait; }
+    .icon-button svg { transition:transform .2s ease; }
+    .icon-button.is-refreshing { color:var(--green); background:var(--mint); }
+    .icon-button.is-refreshing svg { animation:refresh-spin .75s linear infinite; }
+    .icon-button.is-success { color:#fff; border-color:var(--green); background:var(--green); animation:refresh-pop .3s ease-out; }
+    .icon-button.is-error { color:#9b4b28; border-color:#d9ad98; background:#f8e9e1; animation:refresh-shake .3s ease-out; }
+    @keyframes refresh-spin { to { transform:rotate(360deg); } }
+    @keyframes refresh-pop { 50% { transform:scale(1.1); } }
+    @keyframes refresh-shake { 25% { transform:translateX(-2px); } 75% { transform:translateX(2px); } }
+    @media (prefers-reduced-motion:reduce) { .icon-button.is-refreshing svg,.icon-button.is-success,.icon-button.is-error,.history-list.is-refreshing .history-row,.history-list.is-updated .history-row { animation:none; opacity:1; transform:none; } }
+    .history-tools { display:flex; gap:7px; padding:12px 0; }
+    .filter { width:100%; min-width:0; border:1px solid var(--line); border-radius:5px; padding:7px 9px; background:transparent; font-size:12px; }
+    .export { flex:none; display:flex; align-items:center; gap:5px; border:1px solid var(--line); border-radius:5px; background:#fff; color:var(--ink); padding:7px 9px; font-size:12px; cursor:pointer; }
+    .export:hover { background:var(--mint); }
+    .export:disabled { opacity:.45; cursor:not-allowed; background:#fff; }
+    .clear-history { flex:none; display:grid; place-items:center; width:34px; border:1px solid var(--line); border-radius:5px; background:#fff; color:#87513c; }
+    .clear-history:hover { border-color:#d9ad98; background:#f8e9e1; color:#8e3e20; }
+    .clear-history:disabled { opacity:.45; cursor:not-allowed; }
+    .history-list { display:flex; flex-direction:column; }
+    .history-list { max-height:430px; overflow:auto; overscroll-behavior:contain; }
+    .history-list.is-refreshing .history-row { animation:history-refresh-pulse .7s ease-in-out infinite alternate; }
+    .history-list.is-updated .history-row { opacity:0; animation:history-row-in .38s cubic-bezier(.22,.8,.3,1) forwards; animation-delay:var(--row-delay,0ms); }
+    @keyframes history-refresh-pulse { from { opacity:1; transform:translateY(0); } to { opacity:.38; transform:translateY(2px); } }
+    @keyframes history-row-in { from { opacity:0; transform:translateY(-8px); background:var(--mint); } to { opacity:1; transform:translateY(0); background:transparent; } }
+    .history-more { width:100%; border:0; border-top:1px solid var(--line); padding:10px 4px; background:transparent; color:var(--green); font-size:12px; }
+    .history-more:hover { background:var(--mint); }
+    .trend { border-bottom:1px solid var(--line); padding:5px 0 13px; }
+    .trend-title { color:var(--muted); font-size:11px; margin:0 0 5px; }
+    .trend svg { width:100%; height:100px; display:block; overflow:visible; }
+    .trend-label { fill:var(--muted); font:10px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    .trend-empty { color:var(--muted); font-size:11px; padding:9px 0; }
+    .history-row { display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px; padding:12px 1px; border-bottom:1px solid var(--line); }
+    .history-city { font-size:13px; font-weight:600; }
+    .history-date { color:var(--muted); font-size:11px; margin-top:3px; }
+    .history-temp { font-size:16px; font-weight:620; }
+    .empty { color:var(--muted); font-size:13px; padding:24px 0; }
+    .notice { min-height:22px; color:#9b4b28; font-size:12px; margin-top:7px; }
+    .confirm-dialog { width:min(390px,calc(100vw - 34px)); border:1px solid var(--line); border-radius:10px; padding:0; background:var(--white); color:var(--ink); box-shadow:0 20px 60px #18272235; }
+    .confirm-dialog::backdrop { background:#18272255; backdrop-filter:blur(2px); }
+    .confirm-body { padding:22px 22px 10px; }
+    .confirm-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:50%; background:#f8e9e1; color:#9b4b28; }
+    .confirm-icon.export-icon { background:var(--mint); color:var(--green); }
+    .confirm-dialog h3 { margin:14px 0 6px; font-size:17px; }
+    .confirm-dialog p { margin:0; color:var(--muted); font-size:13px; }
+    .confirm-warning { margin-top:10px!important; color:#8e3e20!important; }
+    .confirm-error { min-height:20px; margin-top:8px!important; color:#a23e25!important; }
+    .confirm-actions { display:flex; justify-content:flex-end; gap:8px; padding:12px 22px 20px; }
+    .dialog-button { border:1px solid var(--line); border-radius:6px; padding:8px 13px; background:#fff; color:var(--ink); }
+    .dialog-button:hover { background:#f0f3f1; }
+    .dialog-button.danger { border-color:#9b4b28; background:#9b4b28; color:#fff; font-weight:600; }
+    .dialog-button.danger:hover { background:#813a20; }
+    .dialog-button.confirm-export { border-color:var(--green); background:var(--green); color:#fff; font-weight:600; }
+    .dialog-button.confirm-export:hover { background:#105841; }
+    .dialog-button:disabled { opacity:.6; cursor:wait; }
+    .loading { color:var(--muted); padding:34px 0; }
+    @media (max-width:760px) { .shell{padding:19px 17px 35px;} header{min-height:152px;padding-bottom:22px;} .layout{grid-template-columns:1fr;gap:27px;padding-top:22px;} aside{border-left:0;border-top:1px solid var(--line);padding:23px 0 0;} .temperature{font-size:64px;} .metrics{grid-template-columns:repeat(2,1fr);row-gap:14px;} .metric:nth-child(2){border:0;} .metric:nth-child(3){padding-left:0;} }
+    @media (max-width:360px) { .forecast{grid-template-columns:repeat(5,minmax(48px,1fr));overflow-x:auto;} .day-temps{font-size:11px;} .metric{padding:0 8px;} }
+
+    /* Modern weather journal visual system */
+    :root { --ink:#17231f; --muted:#6e7772; --line:#d8d8cf; --paper:#efeee8; --green:#174c3c; --mint:#e4ebe5; --blue:#e6eceb; --orange:#efe2d5; --white:#fbfaf6; --red:#9d462f; --sun:#d99a39; --shadow:0 18px 45px rgba(37,47,41,.08); }
+    body { background:#efeee8; color:var(--ink); font-family:"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif; letter-spacing:.005em; }
+    body::before { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.025'/%3E%3C/svg%3E"); }
+    .shell { max-width:1260px; padding:28px 34px 60px; }
+    header { min-height:124px; border-bottom:0; padding:8px 0 24px; }
+    header::after { content:""; position:absolute; left:50%; bottom:0; width:72px; height:2px; background:var(--red); transform:translateX(-50%); }
+    .brand { gap:3px; }
+    .mark { width:50px; height:50px; border:0; border-radius:0; color:var(--green); background:transparent; box-shadow:none; }
+    .mark svg { width:43px; height:43px; }
+    .mark::after { right:-4px; bottom:-1px; width:19px; height:19px; border-color:var(--paper); border-radius:2px; background:var(--red); font-size:10px; }
+    .brand h1 { font-size:29px; letter-spacing:.16em; }
+    .brand p { color:#73736b; font-size:12px; letter-spacing:.26em; }
+    .layout { grid-template-columns:minmax(0,1.62fr) minmax(320px,.78fr); gap:18px; padding-top:26px; align-items:start; }
+    .layout > section,aside { border:1px solid #d7d7ce; background:rgba(251,250,246,.92); box-shadow:var(--shadow); }
+    .layout > section { min-width:0; padding:22px; }
+    aside { min-width:0; padding:22px; border-left:1px solid #d7d7ce; }
+    .search { gap:0; margin:0; }
+    .search input { min-height:52px; border:1px solid #bfc7c1; border-right:0; border-radius:0; padding:0 18px; background:#fffefa; font-size:14px; }
+    .search input::placeholder { color:#939a95; }
+    .search input:focus { position:relative; z-index:2; border-color:var(--green); box-shadow:inset 3px 0 0 var(--green); }
+    .primary { min-height:52px; border-radius:0; padding:0 22px; background:var(--green); letter-spacing:.06em; transition:background .18s ease,transform .18s ease; }
+    .primary:hover { background:#0f3d30; }
+    .primary:active { transform:translateY(1px); }
+    .notice { min-height:18px; margin:8px 0 0; }
+    .region-picker { top:calc(100% + 9px); width:min(680px,calc(100vw - 44px)); max-height:min(520px,70vh); border-color:#cfd2ca; border-radius:0; background:#fffefa; box-shadow:0 24px 60px rgba(29,39,34,.18); }
+    .region-picker-head { padding:14px 16px; border-bottom-color:#dfdfd6; }
+    .region-trail { font-size:13px; }
+    .picker-back { border:0; border-bottom:1px solid var(--ink); border-radius:0; padding:3px 0; background:transparent; }
+    .region-caption { padding:12px 16px 5px; font-size:11px; letter-spacing:.04em; }
+    .region-options { gap:3px 8px; padding:7px 10px 15px; }
+    .region-option { border-radius:0; padding:10px 8px; font-size:13px; }
+    .region-option:hover,.region-option:focus { background:#e9eee9; box-shadow:inset 2px 0 0 var(--green); }
+    .search-group-title { padding:12px 8px 6px; color:var(--red); letter-spacing:.13em; text-transform:uppercase; }
+    .search-result { border-bottom:1px solid #e5e4dd; }
+    .search-result-kind { border-radius:0; background:transparent; color:var(--green); font-size:9px; letter-spacing:.1em; }
+    .region-footer { padding:10px 16px; border-top-color:#dfdfd6; background:#f5f3ed; letter-spacing:.04em; }
+    .weather { min-height:468px; border:0; padding:8px 0 0; }
+    .weather-empty { min-height:430px; gap:20px; }
+    .weather-empty::before { content:"等待一场天气"; color:var(--muted); font-family:"STKaiti","Kaiti SC","KaiTi",serif; font-size:17px; letter-spacing:.15em; }
+    .weather-empty-icon { width:72px; height:72px; padding:14px; border:1px solid #bdc8c1; border-radius:50%; color:var(--green); }
+    .weather-empty .primary { min-height:42px; border:1px solid var(--green); background:transparent; color:var(--green); }
+    .weather-empty .primary:hover { background:var(--green); color:#fff; }
+    .weather-top { position:relative; min-height:225px; padding:28px 30px; background:#183f35; color:#f8f4ea; overflow:hidden; }
+    .weather-top::after { content:"观测"; position:absolute; right:-13px; bottom:-30px; color:rgba(255,255,255,.045); font-family:"STKaiti","Kaiti SC","KaiTi",serif; font-size:116px; line-height:1; transform:rotate(-6deg); }
+    .place { position:relative; z-index:1; font-size:22px; letter-spacing:.03em; }
+    .place-meta,.updated { position:relative; z-index:1; color:#b9cbc4; font-size:11px; }
+    .condition { position:relative; z-index:1; margin-top:26px; color:#ecede8; font-size:14px; }
+    .wx-icon { color:#f0ba59; font-family:Georgia,serif; font-size:34px; }
+    .temperature { position:relative; z-index:1; margin-top:5px; font-family:"Bodoni 72","Times New Roman",serif; font-size:82px; font-weight:400; letter-spacing:-.05em; }
+    .temperature sup { font-size:22px; letter-spacing:0; }
+    .updated { text-align:right; line-height:1.7; }
+    .metrics { grid-template-columns:repeat(4,minmax(0,1fr)); margin:0; padding:0; border:1px solid #d8d8cf; border-top:0; background:#f5f3ed; }
+    .metric { min-height:82px; padding:17px 18px; border-right-color:#d8d8cf; }
+    .metric:first-child { padding-left:18px; }
+    .metric-label { letter-spacing:.08em; }
+    .metric-value { margin-top:6px; font-family:"Bodoni 72","Times New Roman",serif; font-size:18px; font-weight:600; }
+    .section-head { margin:27px 0 12px; }
+    .section-head h2 { font-family:"STKaiti","Kaiti SC","KaiTi",serif; font-size:19px; letter-spacing:.09em; }
+    .forecast { gap:7px; border:0; }
+    .day { min-width:0; border:1px solid #dbdbd3; padding:15px 4px; background:#f8f7f2; }
+    .day:last-child { border:1px solid #dbdbd3; }
+    .day:first-child { border-top:2px solid var(--red); }
+    .day-icon { min-height:32px; color:var(--green); font-family:Georgia,serif; font-size:25px; }
+    .day-name { letter-spacing:.06em; }
+    .day-temps { font-family:"Bodoni 72","Times New Roman",serif; font-size:14px; }
+    .day-rain { color:#597a70; }
+    .side-head { padding:0 0 16px; border-bottom:2px solid var(--ink); }
+    .side-head h2 { font-family:"STKaiti","Kaiti SC","KaiTi",serif; font-size:20px; letter-spacing:.09em; }
+    .section-note { margin-top:2px; letter-spacing:.05em; }
+    .icon-button { width:36px; height:36px; border-color:#cfd2ca; border-radius:50%; background:#f8f7f2; }
+    .history-tools { gap:6px; padding:14px 0; }
+    .filter { border-color:#d3d5ce; border-radius:0; padding:9px 10px; background:#f8f7f2; }
+    .filter:focus { outline:1px solid var(--green); background:#fff; }
+    .export,.clear-history { min-height:37px; border-color:#d3d5ce; border-radius:0; background:#f8f7f2; }
+    .trend { min-height:72px; border:1px solid #deded6; border-width:1px 0; padding:12px 2px; }
+    .trend-empty { padding:13px 2px; font-family:"STKaiti","Kaiti SC","KaiTi",serif; font-size:13px; }
+    .history-list { max-height:470px; padding-right:4px; scrollbar-color:#aab3ad transparent; scrollbar-width:thin; }
+    .history-row { min-height:73px; padding:13px 7px; border-bottom-color:#deded6; transition:background .15s ease,padding .15s ease; }
+    .history-row:hover { padding-left:11px; background:#f1f3ed; }
+    .history-city { font-size:13px; letter-spacing:.03em; }
+    .history-date { margin-top:5px; font-size:10px; letter-spacing:.04em; }
+    .history-temp { color:var(--green); font-family:"Bodoni 72","Times New Roman",serif; font-size:22px; font-weight:600; }
+    .history-more { border-top-color:#d8d8cf; padding:12px 4px; letter-spacing:.06em; }
+    .empty { padding:28px 4px; }
+    .confirm-dialog { border:0; border-radius:0; background:#fbfaf6; box-shadow:0 28px 80px rgba(22,31,27,.25); }
+    .confirm-dialog::backdrop { background:rgba(23,35,31,.52); backdrop-filter:none; }
+    .confirm-icon { border-radius:0; }
+    .confirm-dialog h3 { font-family:"STKaiti","Kaiti SC","KaiTi",serif; font-size:21px; letter-spacing:.05em; }
+    .dialog-button { border-radius:0; }
+    @media (max-width:900px) { .layout{grid-template-columns:1fr;gap:18px;} aside{border-left:1px solid #d7d7ce;} .history-list{max-height:390px;} }
+    @media (max-width:600px) { .shell{padding:18px 12px 32px;} header{min-height:116px;padding-bottom:20px;} .brand h1{font-size:25px;} .layout{padding-top:18px;} .layout>section,aside{padding:14px;} .search{gap:7px;flex-direction:column;} .search input{border-right:1px solid #bfc7c1;} .primary{width:100%;} .weather{min-height:390px;} .weather-empty{min-height:350px;} .weather-top{min-height:220px;padding:22px 20px;} .temperature{font-size:70px;} .metrics{grid-template-columns:repeat(2,1fr);} .metric:nth-child(2){border-right:0;} .metric:nth-child(3){border-top:1px solid var(--line);padding-left:18px;} .metric:nth-child(4){border-top:1px solid var(--line);} .forecast{grid-template-columns:repeat(5,minmax(78px,1fr));overflow-x:auto;padding-bottom:5px;} .day-temps{font-size:13px;} .region-picker{width:calc(100vw - 24px);left:-14px;} }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand"><div class="mark" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M26.5 5.5v4M34 13l-3 2M19 13l-3-2M32 22a7 7 0 0 0-11.7-7.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M10.5 28.5a6.5 6.5 0 1 1 2.6-12.45A8 8 0 0 1 29 18.5a5 5 0 0 1-.7 9.98H10.5Z" fill="#f8faf8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="m14 32-1.5 3m7.5-3-1.5 3m7.5-3-1.5 3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></div><h1>天气记录本</h1><p>风雨有时 · 记录有痕</p></div>
+    </header>
+    <main class="layout">
+      <section aria-label="天气查询">
+        <form class="search" id="searchForm"><div class="search-box"><input id="cityInput" type="search" maxlength="80" placeholder="搜索中华人民共和国城市或全球城市" aria-label="搜索中华人民共和国城市或全球城市" aria-haspopup="dialog" aria-expanded="false" autocomplete="off"><div class="region-picker" id="regionPicker" role="dialog" aria-label="城市与中国行政区划选择器" hidden><div class="region-picker-head"><div class="region-trail" id="regionTrail"></div><button type="button" id="pickerBack" class="picker-back">返回</button></div><div class="region-caption" id="regionCaption">选择省级行政区</div><div class="region-options" id="regionOptions"></div><div class="region-footer" id="regionFooter">34 个省级地区 · 选择至县 / 区 ·</div></div></div><button class="primary" id="searchButton" type="submit">查询天气</button></form>
+        <div id="notice" class="notice" role="status" aria-live="polite"></div>
+        <div id="weather" class="weather"><div class="weather-empty"><svg class="weather-empty-icon" width="54" height="54" viewBox="0 0 54 54" fill="none" aria-hidden="true"><path d="M13 36.5a10 10 0 1 1 3.8-19.25A12 12 0 0 1 42 23.5a7 7 0 0 1-1 13.98H13Z" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M18 43v3m9-3v3m9-3v3" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg><button type="button" class="primary" id="emptyChoose">选择地区，查看天气</button></div></div>
+      </section>
+      <aside aria-label="采集历史">
+        <div class="side-head"><div><h2>采集记录</h2><div id="historyCount" class="section-note">读取中…</div></div><button class="icon-button" id="refreshHistory" title="刷新记录" aria-label="刷新记录"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M20 7v5h-5M4 17v-5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.6 9A7 7 0 0 1 18 6.5L20 12M4 12l2 5.5A7 7 0 0 0 18.4 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+        <div class="history-tools"><input class="filter" id="historyFilter" placeholder="按城市筛选趋势" aria-label="按城市筛选"><button type="button" class="export" id="exportHistory" title="导出 CSV" disabled><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>导出</button><button type="button" class="clear-history" id="clearHistory" title="删除所有记录" aria-label="删除所有采集记录" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+        <div id="trend" class="trend"><div class="trend-empty">按城市筛选后查看温度趋势</div></div>
+        <div class="history-list" id="historyList"><div class="empty">还没有采集记录</div></div>
+        <button type="button" class="history-more" id="historyMore" hidden>加载更多记录</button>
+      </aside>
+    </main>
+    <dialog class="confirm-dialog" id="exportDialog" aria-labelledby="exportDialogTitle"><div class="confirm-body"><div class="confirm-icon export-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h3 id="exportDialogTitle">导出采集记录？</h3><p id="exportDialogText">将把所有采集记录导出为 CSV 文件。</p><p class="confirm-warning" style="color:var(--muted)!important;">CSV 可使用 Excel、Numbers 或其他表格软件打开。</p></div><div class="confirm-actions"><button type="button" class="dialog-button" id="cancelExport">取消</button><button type="button" class="dialog-button confirm-export" id="confirmExport">确认导出 CSV</button></div></dialog>
+    <dialog class="confirm-dialog" id="clearDialog" aria-labelledby="clearDialogTitle"><div class="confirm-body"><div class="confirm-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h3 id="clearDialogTitle">删除所有采集记录？</h3><p id="clearDialogText">将删除所有本机采集记录。</p><p class="confirm-warning">此操作无法撤销，建议先导出 CSV 备份。</p><p class="confirm-error" id="clearError" role="alert"></p></div><div class="confirm-actions"><button type="button" class="dialog-button" id="cancelClear">取消</button><button type="button" class="dialog-button danger" id="confirmClear">确认全部删除</button></div></dialog>
+  </div>
+  <script>
+    const $ = (selector) => document.querySelector(selector);
+    const wxText = (code) => code === 0 ? '晴朗' : code === 1 ? '大致晴朗' : code === 2 ? '局部多云' : code === 3 ? '阴天' : [45,48].includes(code) ? '有雾' : [51,53,55,56,57].includes(code) ? '毛毛雨' : [61,63,65,66,67,80,81,82].includes(code) ? '有雨' : [71,73,75,77,85,86].includes(code) ? '有雪' : [95,96,99].includes(code) ? '雷暴' : '天气变化';
+    const wxIcon = (code, day=true) => [95,96,99].includes(code) ? 'ϟ' : [71,73,75,77,85,86].includes(code) ? '❄︎' : [51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code) ? '☔︎' : [45,48].includes(code) ? '≋' : code === 0 ? (day ? '☀︎' : '☾') : [1,2].includes(code) ? '◒' : '☁︎';
+    const number = (value, digits=0) => Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '—';
+    const dateLabel = (value) => { const d = new Date(value); return Number.isNaN(d.getTime()) ? value : new Intl.DateTimeFormat('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(d); };
+    const wallClockLabel = (value) => { const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/); return match ? `${match[2]}/${match[3]} ${match[4]}:${match[5]}` : escapeHtml(value); };
+    let regionData = [], regionPath = [], selectedPath = null, selectedLocation = null, filterText = '', pickerOpen = false;
+    let globalResults = [], globalSearchTimer = 0, globalSearchId = 0;
+    const childList = (nodes, path) => path.reduce((list, index) => list[index]?.children || [], nodes);
+    const flattenRegionPaths = (regions) => {
+      const output = [];
+      regions.forEach(province => province.children.forEach(city => city.children.forEach(county => output.push([province.name, city.name, county.name]))));
+      return output;
+    };
+    let allRegionPaths = [];
+    async function loadRegions() {
+      try { const response = await fetch('/api/regions'); if (!response.ok) throw new Error(); regionData = await response.json(); allRegionPaths = flattenRegionPaths(regionData); }
+      catch (_) { $('#notice').textContent = '行政区划列表暂时无法加载，请刷新页面重试。'; }
+    }
+    function openPicker() {
+      if (!regionData.length) { loadRegions().then(() => { if (regionData.length) openPicker(); }); return; }
+      pickerOpen = true; regionPath = []; filterText = ''; $('#regionPicker').hidden = false; $('#cityInput').setAttribute('aria-expanded','true'); renderPicker();
+    }
+    function closePicker() { pickerOpen = false; $('#regionPicker').hidden = true; $('#cityInput').setAttribute('aria-expanded','false'); }
+    function renderPicker() {
+      if (filterText) { renderSearchPanel(globalResults.length ? 'done' : filterText.length < 2 ? 'hint' : 'loading'); return; }
+      const trail = ['中国'];
+      let nodes = regionData;
+      regionPath.forEach(index => { const item = nodes[index]; if (item) { trail.push(item.name); nodes = item.children || []; } });
+      $('#regionOptions').classList.remove('search-results');
+      $('#pickerBack').textContent = '返回';
+      $('#regionFooter').textContent = '34 个省级地区 · 选择至县 / 区 ·';
+      $('#regionTrail').innerHTML = trail.map((name,index) => {
+        const separator = index ? '<span class="trail-sep" aria-hidden="true">›</span>' : '';
+        const item = index === trail.length - 1
+          ? `<span class="trail-current" aria-current="location">${escapeHtml(name)}</span>`
+          : `<button class="trail-button" type="button" data-level="${index}" aria-label="返回${escapeHtml(name)}重新选择">${escapeHtml(name)}</button>`;
+        return separator + item;
+      }).join('');
+      $('#regionCaption').textContent = regionPath.length === 0 ? '选择省级行政区' : regionPath.length === 1 ? `已选 ${trail[1]} · 选择地级市 / 区域` : `已选 ${trail[1]} / ${trail[2]} · 选择县 / 区`;
+      const options = nodes.map((item,index) => ({name:item.name, detail:item.children?.length ? `${item.children.length} 个县 / 区` : '', index, selectable:false}));
+      $('#regionOptions').innerHTML = options.length ? options.map(item => `<button type="button" class="region-option"><span>${escapeHtml(item.name)}</span>${item.selectable ? `<small>${escapeHtml(item.detail)}</small>` : item.detail ? '<small>›</small>' : ''}</button>`).join('') : '<div class="region-empty">没有匹配地区</div>';
+      $('#regionOptions').querySelectorAll('.region-option').forEach((button,index) => {
+        button.addEventListener('click', event => {
+          event.preventDefault(); event.stopPropagation();
+          chooseRegion(options[index].index);
+        });
+      });
+    }
+    function renderSearchPanel(state) {
+      const localResults = allRegionPaths.filter(path => path.some(part => part.includes(filterText))).slice(0,6);
+      $('#regionOptions').classList.add('search-results');
+      $('#regionTrail').innerHTML = '<span class="trail-button">搜索结果</span>';
+      $('#pickerBack').textContent = '清除';
+      $('#regionCaption').textContent = `正在搜索“${filterText}”`;
+      $('#regionFooter').textContent = '中国行政区划：modood · 全球城市：Open-Meteo';
+      let html = '';
+      if (localResults.length) {
+        html += '<div class="search-group-title">中国行政区</div>' + localResults.map((path,index) => `<button type="button" class="region-option search-result" data-local="${index}"><span class="search-result-main"><span class="search-result-name">${escapeHtml(path[2])}</span><span class="search-result-meta">${escapeHtml(path.slice(0,2).join(' / '))}</span></span><span class="search-result-kind">县 / 区</span></button>`).join('');
+      }
+      if (globalResults.length) {
+        html += '<div class="search-group-title">全球城市</div>' + globalResults.map((place,index) => {
+          const detail = [place.admin1, place.country].filter(Boolean).join(' · ');
+          return `<button type="button" class="region-option search-result" data-global="${index}"><span class="search-result-main"><span class="search-result-name">${escapeHtml(place.name)}</span><span class="search-result-meta">${escapeHtml(detail || place.timezone || '全球城市')}</span></span><span class="search-result-kind">城市</span></button>`;
+        }).join('');
+      } else if (state === 'loading') html += '<div class="global-loading">正在搜索全球城市…</div>';
+      else if (state === 'hint') html += '<div class="global-loading">继续输入城市名称，即可搜索全球城市。</div>';
+      else if (state === 'error') html += '<div class="global-loading">全球城市搜索暂时不可用，中国行政区仍可继续选择。</div>';
+      else if (!localResults.length) html += '<div class="region-empty">没有找到这个城市，请尝试英文名或更完整的名称。</div>';
+      $('#regionOptions').innerHTML = html;
+      $('#regionOptions').querySelectorAll('[data-local]').forEach(button => button.addEventListener('click', () => selectRegion(localResults[Number(button.dataset.local)])));
+      $('#regionOptions').querySelectorAll('[data-global]').forEach(button => button.addEventListener('click', () => selectGlobal(globalResults[Number(button.dataset.global)])));
+    }
+    async function searchGlobal(term) {
+      const requestId = ++globalSearchId;
+      try {
+        const response = await fetch('/api/locations?q='+encodeURIComponent(term));
+        const data = await response.json();
+        if (requestId !== globalSearchId || term !== filterText) return;
+        if (!response.ok) throw new Error();
+        globalResults = data.items || [];
+        renderSearchPanel('done');
+      } catch (_) { if (requestId === globalSearchId && term === filterText) { globalResults = []; renderSearchPanel('error'); } }
+    }
+    function scheduleGlobalSearch() {
+      clearTimeout(globalSearchTimer);
+      globalResults = [];
+      renderSearchPanel(filterText.length < 2 ? 'hint' : 'loading');
+      if (filterText.length >= 2) globalSearchTimer = setTimeout(() => searchGlobal(filterText), 280);
+    }
+    function chooseRegion(itemIndex) {
+      let nodes = regionData;
+      for (const index of regionPath) nodes = nodes[index].children || [];
+      const item = nodes[itemIndex]; if (!item) return;
+      regionPath.push(itemIndex);
+      if (item.children?.length) { renderPicker(); $('#regionOptions').scrollTop = 0; return; }
+      const names = []; nodes = regionData;
+      for (const index of regionPath) { const part = nodes[index]; names.push(part.name); nodes = part.children || []; }
+      selectRegion(names);
+    }
+    function navigateToRegionLevel(level) {
+      const targetLevel = Math.min(Math.max(Number(level) || 0, 0), regionPath.length);
+      regionPath = regionPath.slice(0, targetLevel);
+      filterText = '';
+      globalSearchId++;
+      globalResults = [];
+      renderPicker();
+      $('#regionOptions').scrollTop = 0;
+    }
+    function selectRegion(names) {
+      regionPath = []; selectedLocation = null; $('#cityInput').value = names.join(' / '); closePicker();
+      loadWeather(names[names.length - 1], names);
+    }
+    function selectGlobal(place) {
+      if (!place) return;
+      selectedLocation = place; selectedPath = null; regionPath = [];
+      $('#cityInput').value = [place.name, place.country].filter(Boolean).join(' · ');
+      closePicker();
+      loadWeather(place.name, null, place);
+    }
+    function renderWeather(data) {
+      const c = data.current, p = data.place, daily = data.daily, code = c.weather_code;
+      const days = (daily.time || []).map((date,i) => `<div class="day"><div class="day-name">${i === 0 ? '今天' : new Intl.DateTimeFormat('zh-CN',{weekday:'short'}).format(new Date(date+'T12:00:00'))}</div><div class="day-icon" aria-label="${wxText(daily.weather_code[i])}">${wxIcon(daily.weather_code[i])}</div><div class="day-temps">${number(daily.temperature_2m_max[i])}° / ${number(daily.temperature_2m_min[i])}°</div><div class="day-rain">降水 ${number(daily.precipitation_probability_max?.[i])}%</div></div>`).join('');
+      $('#weather').innerHTML = `<div class="weather-top"><div><h2 class="place">${escapeHtml(p.name)}${p.country ? ' · '+escapeHtml(p.country) : ''}</h2><div class="place-meta">${number(p.latitude,2)}°, ${number(p.longitude,2)}° · ${escapeHtml(data.timezone || '')}</div><div class="condition"><span class="wx-icon">${wxIcon(code,Boolean(c.is_day))}</span><span>${wxText(code)} · ${c.is_day ? '白天' : '夜间'}</span></div><div class="temperature">${number(c.temperature_2m)}<sup>°C</sup></div></div><div class="updated">当地观测时间<br>${wallClockLabel(c.time)}</div></div>
+        <div class="metrics"><div class="metric"><div class="metric-label">体感温度</div><div class="metric-value">${number(c.apparent_temperature)} °C</div></div><div class="metric"><div class="metric-label">相对湿度</div><div class="metric-value">${number(c.relative_humidity_2m)}%</div></div><div class="metric"><div class="metric-label">风速</div><div class="metric-value">${number(c.wind_speed_10m)} km/h</div></div><div class="metric"><div class="metric-label">降水</div><div class="metric-value">${number(c.precipitation,1)} mm</div></div></div>
+        <div class="section-head"><h2>未来 5 天</h2><span class="section-note">每日最高 / 最低 · 降水概率</span></div><div class="forecast">${days}</div>`;
+    }
+    function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+    let weatherRequestId = 0;
+    async function loadWeather(city, path=null, location=null) {
+      const requestedCity = city.trim();
+      if (!requestedCity) { $('#notice').textContent = '请选择一个地区。'; openPicker(); return false; }
+      const requestId = ++weatherRequestId;
+      const button = $('#searchButton'); button.disabled = true; button.textContent = '查询中…'; $('#notice').textContent = '';
+      try {
+        const locationQuery = location ? '&latitude='+encodeURIComponent(location.latitude)+'&longitude='+encodeURIComponent(location.longitude)+'&country='+encodeURIComponent(location.country || '') : '';
+        const response = await fetch('/api/weather?city='+encodeURIComponent(requestedCity)+(path ? '&path='+encodeURIComponent(path.join('|')) : '')+locationQuery);
+        const data = await response.json();
+        if (requestId !== weatherRequestId) return false;
+        if (!response.ok) throw new Error(data.error || '查询失败');
+        renderWeather(data);
+        if (!path) $('#cityInput').value = [data.place.name, data.place.country].filter(Boolean).join(' · ');
+        selectedPath = path ? [...path] : null;
+        selectedLocation = location ? {...location} : null;
+        $('#historyFilter').value = data.place.name;
+        await loadHistory(true);
+        return true;
+      }
+      catch (error) {
+        if (requestId !== weatherRequestId) return false;
+        $('#notice').textContent = error.message || '网络连接失败，请检查网络后重试。';
+        return false;
+      }
+      finally { if (requestId === weatherRequestId) { button.disabled = false; button.textContent = '查询天气'; } }
+    }
+    let historyOffset = 0, historyTotal = 0, historyAllTotal = 0, historyRequestId = 0;
+    async function loadHistory(reset=false) {
+      if (reset) historyOffset = 0;
+      const requestId = ++historyRequestId;
+      const city = $('#historyFilter').value.trim();
+      $('#historyMore').disabled = true;
+      try {
+        const response = await fetch('/api/history?limit=8&offset='+historyOffset+(city ? '&city='+encodeURIComponent(city) : ''));
+        if (!response.ok) throw new Error('历史记录暂时无法读取。');
+        const data = await response.json();
+        if (requestId !== historyRequestId) return;
+        historyTotal = data.total;
+        historyAllTotal = data.all_total ?? data.total;
+        renderTrend(city, data.items);
+        const rows = data.items.map(item => `<div class="history-row"><div><div class="history-city">${escapeHtml(item.city)}${item.country ? ' · '+escapeHtml(item.country) : ''}</div><div class="history-date">${escapeHtml(dateLabel(item.captured_at || item.observed_at))} 本机采集</div></div><div class="history-temp">${number(item.temperature)}°</div></div>`).join('');
+        if (reset || !historyOffset) $('#historyList').innerHTML = rows || '<div class="empty">暂无记录，查询天气后会保存在这里。</div>';
+        else $('#historyList').insertAdjacentHTML('beforeend', rows);
+        historyOffset += data.items.length;
+        $('#historyMore').hidden = !data.has_more;
+        $('#historyCount').textContent = historyTotal ? `${historyTotal} 条记录` : '暂无采集记录';
+        $('#exportHistory').disabled = historyAllTotal === 0;
+        $('#clearHistory').disabled = historyAllTotal === 0;
+        return true;
+      } catch (error) {
+        if (requestId === historyRequestId) $('#historyList').innerHTML = `<div class="empty">${escapeHtml(error.message || '历史记录暂时无法读取。')}</div>`;
+        return false;
+      }
+      finally { if (requestId === historyRequestId) $('#historyMore').disabled = false; }
+    }
+    function renderTrend(city, items) {
+      const readings = items.filter(item => Number.isFinite(Number(item.temperature))).slice(0, 12).reverse();
+      if (!city || readings.length < 2) { $('#trend').innerHTML = `<div class="trend-empty">${city ? '再采集一次即可形成趋势' : '按城市筛选后查看温度趋势'}</div>`; return; }
+      const values = readings.map(item => Number(item.temperature));
+      const min = Math.min(...values), max = Math.max(...values), spread = Math.max(max - min, 2);
+      const points = values.map((value, index) => ({x: 12 + index * 276 / (values.length - 1), y: 72 - (value - (min - spread * .12)) * 48 / (spread * 1.24), value}));
+      const line = points.map(point => `${point.x},${point.y}`).join(' ');
+      const marks = points.map(point => `<circle cx="${point.x}" cy="${point.y}" r="3" fill="#176b52"><title>${number(point.value,1)} °C</title></circle>`).join('');
+      const first = readings[0].captured_at || readings[0].observed_at, last = readings[readings.length - 1].captured_at || readings[readings.length - 1].observed_at;
+      $('#trend').innerHTML = `<p class="trend-title">${escapeHtml(city)} · ${readings.length} 次采集 · ${number(min,1)}° 至 ${number(max,1)}°C</p><svg viewBox="0 0 300 100" role="img" aria-label="${escapeHtml(city)}历史采集温度趋势"><line x1="8" y1="84" x2="292" y2="84" stroke="#dce4df"/><polyline points="${line}" fill="none" stroke="#176b52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>${marks}<text class="trend-label" x="8" y="98">${escapeHtml(dateLabel(first).slice(0,11))}</text><text class="trend-label" x="292" y="98" text-anchor="end">${escapeHtml(dateLabel(last).slice(0,11))}</text></svg>`;
+    }
+    $('#searchForm').addEventListener('submit', event => { event.preventDefault(); const city = selectedLocation?.name || $('#cityInput').value.trim(); if (!city) { $('#notice').textContent = '请选择一个地区。'; openPicker(); return; } closePicker(); regionPath = []; loadWeather(city, selectedPath, selectedLocation); });
+    $('#emptyChoose').addEventListener('click', event => {
+      event.stopPropagation();
+      const input = $('#cityInput');
+      input.scrollIntoView({behavior:'smooth', block:'center'});
+      const alreadyFocused = document.activeElement === input;
+      input.focus({preventScroll:true});
+      if (alreadyFocused && $('#regionPicker').hidden && regionData.length) openPicker();
+    });
+    $('#cityInput').addEventListener('focus', openPicker);
+    $('#cityInput').addEventListener('input', event => {
+      selectedPath = null; selectedLocation = null; regionPath = [];
+      if (!pickerOpen) openPicker();
+      filterText = event.target.value.trim();
+      if (filterText) scheduleGlobalSearch();
+      else { globalSearchId++; globalResults = []; renderPicker(); }
+    });
+    $('#regionTrail').addEventListener('click', event => {
+      const button = event.target.closest('button.trail-button');
+      if (!button) return;
+      event.preventDefault();
+      event.stopPropagation();
+      navigateToRegionLevel(button.dataset.level);
+    });
+    $('#pickerBack').addEventListener('click', () => {
+      if (filterText) { $('#cityInput').value = ''; filterText = ''; globalSearchId++; globalResults = []; regionPath = []; renderPicker(); $('#cityInput').focus(); return; }
+      regionPath = regionPath.slice(0,-1); renderPicker();
+    });
+    $('#cityInput').addEventListener('keydown', event => {
+      if (event.key === 'Escape') closePicker();
+      if (event.key === 'Enter' && pickerOpen && filterText) {
+        const first = allRegionPaths.find(path => path.some(part => part.includes(filterText)));
+        if (first || globalResults[0]) { event.preventDefault(); first ? selectRegion(first) : selectGlobal(globalResults[0]); }
+      }
+    });
+    document.addEventListener('click', event => { if (pickerOpen && !event.target.closest('.search-box')) closePicker(); });
+    let refreshFeedbackTimer;
+    $('#refreshHistory').addEventListener('click', async () => {
+      const button = $('#refreshHistory');
+      const list = $('#historyList');
+      if (button.disabled) return;
+      clearTimeout(refreshFeedbackTimer);
+      button.disabled = true;
+      button.classList.remove('is-success', 'is-error');
+      button.classList.add('is-refreshing');
+      button.title = '正在刷新…';
+      button.setAttribute('aria-label', '正在刷新采集记录');
+      list.classList.remove('is-updated');
+      list.classList.add('is-refreshing');
+      const [succeeded] = await Promise.all([
+        loadHistory(true),
+        new Promise(resolve => setTimeout(resolve, 420))
+      ]);
+      list.classList.remove('is-refreshing');
+      if (succeeded) {
+        list.scrollTo({top:0, behavior:'smooth'});
+        list.querySelectorAll('.history-row').forEach((row, index) => row.style.setProperty('--row-delay', `${Math.min(index * 55, 330)}ms`));
+        void list.offsetWidth;
+        list.classList.add('is-updated');
+        setTimeout(() => list.classList.remove('is-updated'), 900);
+      }
+      button.classList.remove('is-refreshing');
+      button.classList.add(succeeded ? 'is-success' : 'is-error');
+      button.title = succeeded ? '刷新成功' : '刷新失败，请重试';
+      button.setAttribute('aria-label', button.title);
+      button.disabled = false;
+      refreshFeedbackTimer = setTimeout(() => {
+        button.classList.remove('is-success', 'is-error');
+        button.title = '刷新记录';
+        button.setAttribute('aria-label', '刷新记录');
+      }, 1400);
+    });
+    $('#historyMore').addEventListener('click', () => loadHistory(false));
+    $('#exportHistory').addEventListener('click', () => {
+      if (!historyAllTotal) return;
+      $('#exportDialogText').textContent = `将把这台设备上的 ${historyAllTotal} 条采集记录导出为 CSV 文件。`;
+      $('#exportDialog').showModal();
+    });
+    $('#cancelExport').addEventListener('click', () => $('#exportDialog').close());
+    $('#exportDialog').addEventListener('click', event => { if (event.target === event.currentTarget) event.currentTarget.close(); });
+    $('#confirmExport').addEventListener('click', () => {
+      $('#exportDialog').close();
+      const download = document.createElement('a');
+      download.href = '/api/export';
+      download.download = 'weather-history.csv';
+      document.body.appendChild(download);
+      download.click();
+      download.remove();
+    });
+    $('#clearHistory').addEventListener('click', () => {
+      if (!historyAllTotal) return;
+      $('#clearDialogText').textContent = `将删除这台设备上的 ${historyAllTotal} 条采集记录。`;
+      $('#clearError').textContent = '';
+      $('#clearDialog').showModal();
+    });
+    $('#cancelClear').addEventListener('click', () => $('#clearDialog').close());
+    $('#clearDialog').addEventListener('click', event => { if (event.target === event.currentTarget) event.currentTarget.close(); });
+    $('#confirmClear').addEventListener('click', async () => {
+      const confirm = $('#confirmClear'), cancel = $('#cancelClear');
+      confirm.disabled = cancel.disabled = true;
+      confirm.textContent = '正在删除…';
+      $('#clearError').textContent = '';
+      try {
+        const response = await fetch('/api/history', {method:'DELETE'});
+        if (!response.ok) throw new Error('删除失败，请稍后重试。');
+        const data = await response.json();
+        historyRequestId++;
+        historyOffset = historyTotal = historyAllTotal = 0;
+        $('#historyFilter').value = '';
+        $('#historyList').innerHTML = '<div class="empty">还没有采集记录。查询天气后会保存在这里。</div>';
+        $('#historyMore').hidden = true;
+        $('#exportHistory').disabled = true;
+        $('#clearHistory').disabled = true;
+        renderTrend('', []);
+        $('#clearDialog').close();
+        $('#historyCount').textContent = `已删除 ${data.deleted || 0} 条记录`;
+        setTimeout(() => { if (!historyTotal) $('#historyCount').textContent = '暂无采集记录'; }, 1600);
+      } catch (error) {
+        $('#clearError').textContent = error.message || '删除失败，请稍后重试。';
+      } finally {
+        confirm.disabled = cancel.disabled = false;
+        confirm.textContent = '确认全部删除';
+      }
+    });
+    let historyScrollFrame = 0;
+    $('#historyList').addEventListener('scroll', event => {
+      if (historyScrollFrame) return;
+      const list = event.currentTarget;
+      historyScrollFrame = requestAnimationFrame(() => {
+        historyScrollFrame = 0;
+        const more = $('#historyMore');
+        const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight <= 40;
+        if (nearBottom && !more.hidden && !more.disabled) loadHistory(false);
+      });
+    });
+    $('#historyFilter').addEventListener('input', () => { clearTimeout(window.filterTimer); window.filterTimer = setTimeout(() => loadHistory(true), 220); });
+    loadRegions(); loadHistory(true);
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+weather_history.db
+
+# Local-only files
+.DS_Store
+.pycache/
+*.db-wal
+*.db-shm
+.venv/
+venv/
+.env
+.env.*
+!.env.example
